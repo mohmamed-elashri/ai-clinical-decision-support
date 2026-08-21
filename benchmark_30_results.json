@@ -1,0 +1,772 @@
+{
+  "benchmark": "30-question retrieval benchmark",
+  "corpus_chunks": 191,
+  "k": 3,
+  "sets": {
+    "primary": 10,
+    "paraphrase": 10,
+    "negative": 10
+  },
+  "architectures": {
+    "dense": {
+      "primary": {
+        "n": 10,
+        "precision_at_3": 0.5666666666666667,
+        "page_recall_at_3": 1.0,
+        "doc_hit_at_3": 1.0,
+        "latency_ms_mean": 30.209720000857487,
+        "latency_ms_p95": 31.333399994764477
+      },
+      "paraphrase": {
+        "n": 10,
+        "precision_at_3": 0.4333333333333333,
+        "page_recall_at_3": 0.8,
+        "doc_hit_at_3": 1.0,
+        "latency_ms_mean": 31.356630008667707,
+        "latency_ms_p95": 35.332700004801154
+      },
+      "negative": {
+        "n": 10,
+        "score_available": 10,
+        "abstain_pass_rate": 1.0,
+        "details": [
+          {
+            "question": "What screening interval does this guideline recommend for breast cancer?",
+            "top_dense_score": 0.6146549465470192,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the recommended antibiotic regimen for community-acquired pneumonia?",
+            "top_dense_score": 0.5214101779465425,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What insulin regimen is recommended for newly diagnosed type 1 diabetes?",
+            "top_dense_score": 0.6464925544559073,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the WHO-recommended COVID-19 booster interval for immunocompromised adults?",
+            "top_dense_score": 0.5807597374689506,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What surgical approach is preferred for acute appendicitis in pregnancy?",
+            "top_dense_score": 0.5013171397199495,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "Which inhaled corticosteroid dose should be used for moderate persistent asthma in children?",
+            "top_dense_score": 0.5171281506171748,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the first-line antidepressant for major depressive disorder in elderly patients?",
+            "top_dense_score": 0.5682972064014018,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "How should chronic kidney disease stage 4 be managed with dialysis planning?",
+            "top_dense_score": 0.5872877844752312,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the recommended chemotherapy regimen for breast cancer?",
+            "top_dense_score": 0.5346214951195609,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "How should an acute ischemic stroke be managed in the emergency department?",
+            "top_dense_score": 0.5988591940001659,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          }
+        ]
+      }
+    },
+    "bm25": {
+      "primary": {
+        "n": 10,
+        "precision_at_3": 0.4333333333333334,
+        "page_recall_at_3": 0.9,
+        "doc_hit_at_3": 1.0,
+        "latency_ms_mean": 1.9429899984970689,
+        "latency_ms_p95": 2.958900004159659
+      },
+      "paraphrase": {
+        "n": 10,
+        "precision_at_3": 0.3666666666666666,
+        "page_recall_at_3": 0.8,
+        "doc_hit_at_3": 1.0,
+        "latency_ms_mean": 2.2965599957387894,
+        "latency_ms_p95": 2.7099999715574086
+      },
+      "negative": {
+        "n": 10,
+        "score_available": 0,
+        "abstain_pass_rate": null,
+        "details": [
+          {
+            "question": "What screening interval does this guideline recommend for breast cancer?",
+            "top_dense_score": null,
+            "limit": 0.65,
+            "passed": false,
+            "score_available": false
+          },
+          {
+            "question": "What is the recommended antibiotic regimen for community-acquired pneumonia?",
+            "top_dense_score": null,
+            "limit": 0.65,
+            "passed": false,
+            "score_available": false
+          },
+          {
+            "question": "What insulin regimen is recommended for newly diagnosed type 1 diabetes?",
+            "top_dense_score": null,
+            "limit": 0.65,
+            "passed": false,
+            "score_available": false
+          },
+          {
+            "question": "What is the WHO-recommended COVID-19 booster interval for immunocompromised adults?",
+            "top_dense_score": null,
+            "limit": 0.65,
+            "passed": false,
+            "score_available": false
+          },
+          {
+            "question": "What surgical approach is preferred for acute appendicitis in pregnancy?",
+            "top_dense_score": null,
+            "limit": 0.6,
+            "passed": false,
+            "score_available": false
+          },
+          {
+            "question": "Which inhaled corticosteroid dose should be used for moderate persistent asthma in children?",
+            "top_dense_score": null,
+            "limit": 0.6,
+            "passed": false,
+            "score_available": false
+          },
+          {
+            "question": "What is the first-line antidepressant for major depressive disorder in elderly patients?",
+            "top_dense_score": null,
+            "limit": 0.6,
+            "passed": false,
+            "score_available": false
+          },
+          {
+            "question": "How should chronic kidney disease stage 4 be managed with dialysis planning?",
+            "top_dense_score": null,
+            "limit": 0.65,
+            "passed": false,
+            "score_available": false
+          },
+          {
+            "question": "What is the recommended chemotherapy regimen for breast cancer?",
+            "top_dense_score": null,
+            "limit": 0.6,
+            "passed": false,
+            "score_available": false
+          },
+          {
+            "question": "How should an acute ischemic stroke be managed in the emergency department?",
+            "top_dense_score": null,
+            "limit": 0.65,
+            "passed": false,
+            "score_available": false
+          }
+        ]
+      }
+    },
+    "rrf_1.0_1.0": {
+      "primary": {
+        "n": 10,
+        "precision_at_3": 0.6,
+        "page_recall_at_3": 1.0,
+        "doc_hit_at_3": 1.0,
+        "latency_ms_mean": 0.06392000359483063,
+        "latency_ms_p95": 0.08069997420534492
+      },
+      "paraphrase": {
+        "n": 10,
+        "precision_at_3": 0.4666666666666666,
+        "page_recall_at_3": 1.0,
+        "doc_hit_at_3": 1.0,
+        "latency_ms_mean": 0.052930001402273774,
+        "latency_ms_p95": 0.056299963034689426
+      },
+      "negative": {
+        "n": 10,
+        "score_available": 10,
+        "abstain_pass_rate": 1.0,
+        "details": [
+          {
+            "question": "What screening interval does this guideline recommend for breast cancer?",
+            "top_dense_score": 0.596,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the recommended antibiotic regimen for community-acquired pneumonia?",
+            "top_dense_score": 0.512,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What insulin regimen is recommended for newly diagnosed type 1 diabetes?",
+            "top_dense_score": 0.646,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the WHO-recommended COVID-19 booster interval for immunocompromised adults?",
+            "top_dense_score": 0.568,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What surgical approach is preferred for acute appendicitis in pregnancy?",
+            "top_dense_score": 0.446,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "Which inhaled corticosteroid dose should be used for moderate persistent asthma in children?",
+            "top_dense_score": 0.515,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the first-line antidepressant for major depressive disorder in elderly patients?",
+            "top_dense_score": 0.492,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "How should chronic kidney disease stage 4 be managed with dialysis planning?",
+            "top_dense_score": 0.566,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the recommended chemotherapy regimen for breast cancer?",
+            "top_dense_score": 0.535,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "How should an acute ischemic stroke be managed in the emergency department?",
+            "top_dense_score": 0.599,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          }
+        ]
+      }
+    },
+    "rrf_1.5_1.0": {
+      "primary": {
+        "n": 10,
+        "precision_at_3": 0.6,
+        "page_recall_at_3": 1.0,
+        "doc_hit_at_3": 1.0,
+        "latency_ms_mean": 0.046250008745118976,
+        "latency_ms_p95": 0.05139998393133283
+      },
+      "paraphrase": {
+        "n": 10,
+        "precision_at_3": 0.4333333333333333,
+        "page_recall_at_3": 1.0,
+        "doc_hit_at_3": 1.0,
+        "latency_ms_mean": 0.042830000165849924,
+        "latency_ms_p95": 0.04579999949783087
+      },
+      "negative": {
+        "n": 10,
+        "score_available": 10,
+        "abstain_pass_rate": 1.0,
+        "details": [
+          {
+            "question": "What screening interval does this guideline recommend for breast cancer?",
+            "top_dense_score": 0.596,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the recommended antibiotic regimen for community-acquired pneumonia?",
+            "top_dense_score": 0.512,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What insulin regimen is recommended for newly diagnosed type 1 diabetes?",
+            "top_dense_score": 0.646,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the WHO-recommended COVID-19 booster interval for immunocompromised adults?",
+            "top_dense_score": 0.568,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What surgical approach is preferred for acute appendicitis in pregnancy?",
+            "top_dense_score": 0.446,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "Which inhaled corticosteroid dose should be used for moderate persistent asthma in children?",
+            "top_dense_score": 0.515,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the first-line antidepressant for major depressive disorder in elderly patients?",
+            "top_dense_score": 0.492,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "How should chronic kidney disease stage 4 be managed with dialysis planning?",
+            "top_dense_score": 0.566,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the recommended chemotherapy regimen for breast cancer?",
+            "top_dense_score": 0.535,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "How should an acute ischemic stroke be managed in the emergency department?",
+            "top_dense_score": 0.599,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          }
+        ]
+      }
+    },
+    "rrf_2.0_1.0": {
+      "primary": {
+        "n": 10,
+        "precision_at_3": 0.6,
+        "page_recall_at_3": 1.0,
+        "doc_hit_at_3": 1.0,
+        "latency_ms_mean": 0.04301000153645873,
+        "latency_ms_p95": 0.046999950427562
+      },
+      "paraphrase": {
+        "n": 10,
+        "precision_at_3": 0.4333333333333333,
+        "page_recall_at_3": 1.0,
+        "doc_hit_at_3": 1.0,
+        "latency_ms_mean": 0.041269982466474175,
+        "latency_ms_p95": 0.0447999918833375
+      },
+      "negative": {
+        "n": 10,
+        "score_available": 10,
+        "abstain_pass_rate": 1.0,
+        "details": [
+          {
+            "question": "What screening interval does this guideline recommend for breast cancer?",
+            "top_dense_score": 0.596,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the recommended antibiotic regimen for community-acquired pneumonia?",
+            "top_dense_score": 0.512,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What insulin regimen is recommended for newly diagnosed type 1 diabetes?",
+            "top_dense_score": 0.646,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the WHO-recommended COVID-19 booster interval for immunocompromised adults?",
+            "top_dense_score": 0.568,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What surgical approach is preferred for acute appendicitis in pregnancy?",
+            "top_dense_score": 0.446,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "Which inhaled corticosteroid dose should be used for moderate persistent asthma in children?",
+            "top_dense_score": 0.515,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the first-line antidepressant for major depressive disorder in elderly patients?",
+            "top_dense_score": 0.5,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "How should chronic kidney disease stage 4 be managed with dialysis planning?",
+            "top_dense_score": 0.566,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the recommended chemotherapy regimen for breast cancer?",
+            "top_dense_score": 0.535,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "How should an acute ischemic stroke be managed in the emergency department?",
+            "top_dense_score": 0.599,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          }
+        ]
+      }
+    },
+    "rrf_1.0_1.5": {
+      "primary": {
+        "n": 10,
+        "precision_at_3": 0.5333333333333333,
+        "page_recall_at_3": 1.0,
+        "doc_hit_at_3": 1.0,
+        "latency_ms_mean": 0.04430999397300184,
+        "latency_ms_p95": 0.047799956519156694
+      },
+      "paraphrase": {
+        "n": 10,
+        "precision_at_3": 0.4666666666666666,
+        "page_recall_at_3": 1.0,
+        "doc_hit_at_3": 1.0,
+        "latency_ms_mean": 0.04156001377850771,
+        "latency_ms_p95": 0.044899992644786835
+      },
+      "negative": {
+        "n": 10,
+        "score_available": 10,
+        "abstain_pass_rate": 1.0,
+        "details": [
+          {
+            "question": "What screening interval does this guideline recommend for breast cancer?",
+            "top_dense_score": 0.596,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the recommended antibiotic regimen for community-acquired pneumonia?",
+            "top_dense_score": 0.512,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What insulin regimen is recommended for newly diagnosed type 1 diabetes?",
+            "top_dense_score": 0.646,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the WHO-recommended COVID-19 booster interval for immunocompromised adults?",
+            "top_dense_score": 0.568,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What surgical approach is preferred for acute appendicitis in pregnancy?",
+            "top_dense_score": 0.406,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "Which inhaled corticosteroid dose should be used for moderate persistent asthma in children?",
+            "top_dense_score": 0.515,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the first-line antidepressant for major depressive disorder in elderly patients?",
+            "top_dense_score": 0.492,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "How should chronic kidney disease stage 4 be managed with dialysis planning?",
+            "top_dense_score": 0.566,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the recommended chemotherapy regimen for breast cancer?",
+            "top_dense_score": 0.535,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "How should an acute ischemic stroke be managed in the emergency department?",
+            "top_dense_score": 0.599,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          }
+        ]
+      }
+    },
+    "rrf_expanded": {
+      "primary": {
+        "n": 10,
+        "precision_at_3": 0.5666666666666667,
+        "page_recall_at_3": 1.0,
+        "doc_hit_at_3": 1.0,
+        "latency_ms_mean": 0.05474998033605516,
+        "latency_ms_p95": 0.05689996760338545
+      },
+      "paraphrase": {
+        "n": 10,
+        "precision_at_3": 0.4666666666666666,
+        "page_recall_at_3": 1.0,
+        "doc_hit_at_3": 1.0,
+        "latency_ms_mean": 0.05115999956615269,
+        "latency_ms_p95": 0.05319999763742089
+      },
+      "negative": {
+        "n": 10,
+        "score_available": 10,
+        "abstain_pass_rate": 0.9,
+        "details": [
+          {
+            "question": "What screening interval does this guideline recommend for breast cancer?",
+            "top_dense_score": 0.596,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the recommended antibiotic regimen for community-acquired pneumonia?",
+            "top_dense_score": 0.512,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What insulin regimen is recommended for newly diagnosed type 1 diabetes?",
+            "top_dense_score": 0.646,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the WHO-recommended COVID-19 booster interval for immunocompromised adults?",
+            "top_dense_score": 0.568,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What surgical approach is preferred for acute appendicitis in pregnancy?",
+            "top_dense_score": 0.446,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "Which inhaled corticosteroid dose should be used for moderate persistent asthma in children?",
+            "top_dense_score": 0.515,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the first-line antidepressant for major depressive disorder in elderly patients?",
+            "top_dense_score": 0.631,
+            "limit": 0.6,
+            "passed": false,
+            "score_available": true
+          },
+          {
+            "question": "How should chronic kidney disease stage 4 be managed with dialysis planning?",
+            "top_dense_score": 0.566,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the recommended chemotherapy regimen for breast cancer?",
+            "top_dense_score": 0.535,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "How should an acute ischemic stroke be managed in the emergency department?",
+            "top_dense_score": 0.599,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          }
+        ]
+      }
+    },
+    "rrf_diverse": {
+      "primary": {
+        "n": 10,
+        "precision_at_3": 0.5333333333333333,
+        "page_recall_at_3": 1.0,
+        "doc_hit_at_3": 1.0,
+        "latency_ms_mean": 0.0498899957165122,
+        "latency_ms_p95": 0.05440000677481294
+      },
+      "paraphrase": {
+        "n": 10,
+        "precision_at_3": 0.4666666666666666,
+        "page_recall_at_3": 1.0,
+        "doc_hit_at_3": 1.0,
+        "latency_ms_mean": 0.046190014109015465,
+        "latency_ms_p95": 0.05010003224015236
+      },
+      "negative": {
+        "n": 10,
+        "score_available": 10,
+        "abstain_pass_rate": 1.0,
+        "details": [
+          {
+            "question": "What screening interval does this guideline recommend for breast cancer?",
+            "top_dense_score": 0.596,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the recommended antibiotic regimen for community-acquired pneumonia?",
+            "top_dense_score": 0.512,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What insulin regimen is recommended for newly diagnosed type 1 diabetes?",
+            "top_dense_score": 0.646,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the WHO-recommended COVID-19 booster interval for immunocompromised adults?",
+            "top_dense_score": 0.568,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What surgical approach is preferred for acute appendicitis in pregnancy?",
+            "top_dense_score": 0.446,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "Which inhaled corticosteroid dose should be used for moderate persistent asthma in children?",
+            "top_dense_score": 0.515,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the first-line antidepressant for major depressive disorder in elderly patients?",
+            "top_dense_score": 0.492,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "How should chronic kidney disease stage 4 be managed with dialysis planning?",
+            "top_dense_score": 0.566,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "What is the recommended chemotherapy regimen for breast cancer?",
+            "top_dense_score": 0.535,
+            "limit": 0.6,
+            "passed": true,
+            "score_available": true
+          },
+          {
+            "question": "How should an acute ischemic stroke be managed in the emergency department?",
+            "top_dense_score": 0.599,
+            "limit": 0.65,
+            "passed": true,
+            "score_available": true
+          }
+        ]
+      }
+    }
+  }
+}

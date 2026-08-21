@@ -1,0 +1,11 @@
+.venv
+__pycache__
+*.pyc
+.env
+.git
+.gitignore
+scratch
+notebooks
+*.ipynb
+*.md
+benchmark_30_results.json

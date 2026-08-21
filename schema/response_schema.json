@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Grounded Clinical Response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "answer", "evidence", "citations", "confidence"],
+  "properties": {
+    "status": {"type": "string", "enum": ["grounded", "abstain"]},
+    "answer": {"type": "string"},
+    "evidence": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "citations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["document_name", "page_number"],
+        "properties": {
+          "document_name": {"type": "string"},
+          "page_number": {"type": ["integer", "string"]},
+          "chunk_id": {"type": "string"}
+        }
+      }
+    },
+    "confidence": {"type": "string", "enum": ["confident", "uncertain", "insufficient"]},
+    "reason": {"type": "string"},
+    "top_score": {"type": "number"},
+    "generation_method": {
+      "type": "string",
+      "enum": ["llm", "extractive_fallback", "none"],
+      "description": "Which generation path produced this response: live LLM, extractive fallback, or abstain (none)."
+    },
+    "retrieved_chunks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["text", "document_name", "page_number", "chunk_id"],
+        "properties": {
+          "rank": {"type": "integer"},
+          "text": {"type": "string"},
+          "document_name": {"type": ["string", "null"]},
+          "page_number": {"type": ["integer", "string", "null"]},
+          "section": {"type": ["string", "null"]},
+          "chunk_id": {"type": ["string", "null"]},
+          "score": {"type": "number"},
+          "dense_score": {"type": "number"},
+          "rerank_score": {"type": "number"},
+          "rrf_score": {"type": "number"},
+          "confidence": {"type": "string"},
+          "retrieval_method": {"type": "string"}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,414 @@
+# AI Clinical Decision Support Lite — Discussion and Defense Report
+
+## 0. Executive Summary
+
+This project provides evidence-grounded clinical guideline question answering for clinicians and other clinical users working with the indexed WHO hypertension guidance.
+
+Headline results from the saved 30-question benchmark (`benchmark_30_results.json`), using equal-weight RRF at K=3:
+
+- **191 indexed chunks** in the benchmarked corpus.
+- **60.0% primary Precision@3** across 10 reviewed primary questions.
+- **100.0% paraphrase PageRecall@3** across 10 held-out paraphrase questions.
+- **100.0% negative-control abstention** across 10 out-of-scope questions.
+
+The single most important limitation is that the system has not been clinically validated beyond this small, fixed guideline corpus and benchmark, so these results do not establish safe real-world clinical deployment.
+
+## 1. Phase 1 — Ingestion & Indexing (Day 1)
+
+### What was done and why
+
+The ingestion pipeline reads every PDF in `config.DATA_DIR` (`data/`) with `PyPDFLoader`, creates one page-level document per extracted page, cleans repeated guideline headers and page-number noise, attaches citation metadata, splits the pages into chunks, embeds those chunks locally, and persists them in the Chroma collection `clinical_guidelines`. This creates a searchable evidence base while preserving `document_name`, a human-readable 1-indexed `page_number`, and a stable `chunk_id` for later citations.
+
+### Verified corpus and index counts
+
+The current `data/` directory contains **2 PDF files** and `load_pdfs(config.DATA_DIR)` loaded **104 pages**:
+
+| Document | Extracted pages | Indexed chunks | Pages represented by indexed chunks |
+| --- | ---: | ---: | ---: |
+| `Guideline for the pharmacological treatment of hypertension in adults.pdf` | 61 | 114 | 58 |
+| `WHO-NMH-NVI-18.2-eng.pdf` | 43 | 77 | 42 |
+| **Total** | **104** | **191** | **100** |
+
+These figures were measured against the current files and persisted Chroma collection using the project `.venv`; the Chroma collection count is 191. The 100 represented pages is lower than the 104 loaded pages because pages that produce no usable chunk text do not receive an indexed chunk. The saved benchmark independently records the same current index size as `corpus_chunks: 191`.
+
+### Chunking and text cleaning
+
+`config.py` sets `CHUNK_SIZE = 500`, `CHUNK_OVERLAP = 75`, and `CHARS_PER_TOKEN = 4`. Therefore, the splitter target is approximately 2,000 characters with approximately 300 characters of overlap. `ingest.py` uses `RecursiveCharacterTextSplitter` with the separator priority `"\\n\\n"`, `"\\n"`, `". "`, `" "`, then the empty separator, which favors paragraph, line, and sentence boundaries before falling back to spaces or characters.
+
+The cleaning function is explicitly described in `ingest.py` as:
+
+> `"Remove repeated headers, orphan page numbers, and excess whitespace."`
+
+The implementation removes the configured repeated WHO/guideline headers, removes lines containing only page numbers, collapses repeated spaces and tabs, and strips the result. Page metadata is applied before splitting, so the splitter preserves the source document and page metadata on the resulting chunks. Each chunk then receives an ID in the form `{document_name}_p{page_number}_c{counter}`.
+
+### Embedding model and rationale
+
+The active embedding model is **`BAAI/bge-small-en-v1.5`**, configured in `config.py` and constructed in `ingest.py` through `FastEmbedEmbeddings`. The code documents the operational reason for this choice: it is a local embedding model that requires no API key; the configuration also labels it “Local, no-API-key-needed.” This makes ingestion and retrieval independent of a paid or remote embedding service. Comparative quality claims belong to Phase 2 and are not inferred here.
+
+### Day 1 documentation gaps to carry forward
+
+The current code and files do not fully match `DAY1_REPORT.md`:
+
+- `DAY1_REPORT.md` reports **190 chunks**; the current persisted collection contains **191**.
+- Its per-document table reports **76 chunks** for `WHO-NMH-NVI-18.2-eng.pdf`; the current count is **77**. The first document remains 114 chunks.
+- The report says “all the documents 7” in `data/`, but the current `data/` directory contains **2 PDF files**.
+- A report example cites `WHO_Hypertension_Guideline_2021.pdf`, but that filename is not present in the current `data/` directory or the current indexed metadata; the active files are the two filenames shown in the table above.
+- The report describes the index write as using `Chroma.from_documents` with IDs, while the current `ingest.py` implementation constructs `Chroma` and calls `add_documents(..., ids=[...])` in batches. The current implementation is the source of truth for the present index.
+
+These discrepancies are recorded for the consolidated documentation consistency check in Section 8.
+
+## 2. Phase 2 — Retrieval Optimization (Day 2)
+
+### Test-set methodology
+
+The original `evaluation_set.py` contains 10 positive questions and 2 original negative controls. The positive questions cover both active PDFs: six questions target the pharmacological hypertension guideline and four target the HEARTS technical package. Each positive item stores an expected document and reviewed source-page list. The labels are declared in the file as grounded in indexed PDF text rather than generated from retrieval output; the notes identify the clinical section or page rationale.
+
+For the 30-question benchmark, `evaluation_set_30.py` combines:
+
+- **10 primary positives** from `evaluation_set.py`.
+- **10 held-out paraphrases** from `evaluation_set_robustness.py`, with different wording and paired ground-truth pages.
+- **10 negatives**: the two original out-of-scope controls, six hard negatives from adjacent clinical domains, and two additional unrelated clinical controls.
+
+The benchmark therefore evaluates page-level retrieval against reviewed labels, while negative controls are evaluated by whether the top dense score stays below each case's configured maximum. Negative questions are not used as positive recall labels.
+
+### Top-K experiment
+
+I ran `evaluate_retrieval.py` against the current 191-chunk persisted index. Its configured K values are `(1, 3, 4, 5, 10)`, and its metrics are computed over the 10 positive questions:
+
+| K | Precision@K | PageRecall@K | DocHit@K | Mean latency from run |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 80.00% | 80.00% | 100.00% | 43.4 ms |
+| 3 | 56.67% | 100.00% | 100.00% | 35.5 ms |
+| 4 | 50.00% | 100.00% | 100.00% | 32.6 ms |
+| 5 | 40.00% | 100.00% | 100.00% | 40.4 ms |
+| 10 | 25.00% | 100.00% | 100.00% | 35.8 ms |
+
+The script marks **K=3** as selected because it is the smallest tested K reaching 100% page recall and 100% document hit while retaining more precision than larger K values. The same run reported all displayed K values at 100% DocHit. At K=3, the negative controls printed by the script passed their score guard in the run output.
+
+### Embedding-model comparison
+
+`evaluate_embeddings.py` rebuilds a transient Chroma collection for each model using the same 104 pages and 191 chunks, then measures Precision@3, PageRecall@3, and mean query latency over the 10 positive questions. In the current environment, the run produced these completed measurements:
+
+| Model | Precision@3 | PageRecall@3 | Mean latency from run | Decision supported by the run |
+| --- | ---: | ---: | ---: | --- |
+| `BAAI/bge-small-en-v1.5` | 56.67% | 100.00% | 47.7 ms | Current configured model; completed baseline |
+| `sentence-transformers/all-MiniLM-L6-v2` | 30.00% | 60.00% | 8.6 ms | Rejected on retrieval quality |
+| `BAAI/bge-base-en-v1.5` | No completed result produced in this run | No completed result | No completed result | No current-run decision |
+
+The last model began initialization but did not emit a completed metric or saved result artifact in the current run. Consequently, the older `DAY2_REPORT.md` table claiming 50.0%/80.0% for bge-base is not treated as verified current evidence. The saved benchmark does verify the current bge-small dense result on a larger 30-question evaluation at 56.67% primary Precision@3 and 43.33% paraphrase Precision@3.
+
+### Dense, BM25, RRF, and additional hybrid experiments
+
+The authoritative saved artifact is `benchmark_30_results.json`, produced by `benchmark_30.py` at K=3 on 10 primary, 10 paraphrase, and 10 negative questions:
+
+| Architecture or variant | Primary P@3 | Primary PageRecall@3 | Paraphrase P@3 | Paraphrase PageRecall@3 | Negative abstain pass rate | Decision |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Dense bge-small | 56.67% | 100% | 43.33% | 80% | 100% | Baseline and runtime fallback |
+| BM25 | 43.33% | 90% | 36.67% | 80% | Not available | Not sufficient for the dense score guard |
+| Equal-weight RRF (`1.0/1.0`) | 60.00% | 100% | 46.67% | 100% | 100% | Best measured balanced fusion policy |
+| Weighted RRF (`1.5/1.0`) | 60.00% | 100% | 43.33% | 100% | 100% | No improvement over equal weights |
+| Weighted RRF (`2.0/1.0`) | 60.00% | 100% | 43.33% | 100% | 100% | No improvement over equal weights |
+| Weighted RRF (`1.0/1.5`) | 53.33% | 100% | 46.67% | 100% | 100% | Lower primary precision |
+| RRF with clinical query expansion | 56.67% | 100% | 46.67% | 100% | 90% | Rejected; one negative control failed |
+| RRF with page diversification | 53.33% | 100% | 46.67% | 100% | 100% | Rejected; lower primary precision |
+
+Equal-weight RRF is the strongest saved result because it improves primary Precision@3 from 56.67% to 60.00%, improves paraphrase Precision@3 from 43.33% to 46.67%, and improves paraphrase PageRecall@3 from 80% to 100% without losing the 100% negative-control pass rate. The implementation retains `dense_score` separately for abstention; RRF rank scores are not used as calibrated relevance probabilities.
+
+### Chunk-size and reranking experiments
+
+`chunk_ablation.py` defines three intended transient tests: 300/40, the current 500/75, and 700/100 tokens/overlap, scored with Precision@5. The current run did not produce a complete ablation table or result file; it stopped around Chroma/telemetry initialization. Therefore, no ablation winner is claimed here. The current 500/75 setting remains in `config.py` because it is the active production index configuration, not because a completed current ablation has been verified in this report.
+
+The code supports two FlashRank paths: dense-first reranking in `dense_reranker.py`, and RRF candidate fusion followed by reranking in `hybrid_retriever.py`. `benchmark_30.py --with-rerank` is opt-in. No completed reranker metrics are present in `benchmark_30_results.json`; the saved `BENCHMARK_30_REPORT.md` records that the attempted FlashRank run stalled after model initialization. FlashRank is therefore not part of the measured production recommendation.
+
+### Final configuration and decision
+
+There are two distinct conclusions. The **best measured offline retrieval policy** is equal-weight RRF at K=3, with the dense score preserved as the abstention signal. However, the **current runtime default** is still Dense at K=3: `config.py` sets `TOP_K = 3` and defaults `RETRIEVAL_MODE` to `dense`; RRF is available through the opt-in retrieval mode. This distinction is important: the benchmark supports RRF as the quality-leading experiment, but the checked-in default has not silently been changed to RRF.
+
+The older `DAY2_REPORT.md` claims 63.3% current Dense Precision@3, 190 chunks, and an 8 ms latency. The fresh K run and saved 30-question benchmark instead report 56.67% Dense Precision@3 on 191 chunks; the current run's mean latency was 35.5 ms. These are documented contradictions for Section 8, not blended into a single number.
+
+## 3. Phase 3 — Grounded Generation & Safety (Day 3+)
+
+### Response schema
+
+The actual schema is `schema/response_schema.json`, Draft 7. It requires these five top-level fields:
+
+| Field | Required shape and meaning |
+| --- | --- |
+| `status` | String, exactly `grounded` or `abstain` |
+| `answer` | String; empty for an abstain response by the prompt contract |
+| `evidence` | Array of string evidence snippets |
+| `citations` | Array of citation objects |
+| `confidence` | String, exactly `confident`, `uncertain`, or `insufficient` |
+
+Top-level extra properties are rejected. Each citation must contain `document_name` (string) and `page_number` (integer or string); `chunk_id` is optional in the citation schema. The schema also permits optional `reason` and `top_score` fields, plus `generation_method` (`llm`, `extractive_fallback`, or `none`) and `retrieved_chunks`. Retrieved chunks must contain `text`, `document_name`, `page_number`, and `chunk_id`, with additional metadata allowed inside those chunk objects.
+
+The API applies the schema in `app.py`: it loads the JSON schema, creates a `jsonschema.Draft7Validator`, validates the result returned by `answer_question`, and returns HTTP 500 with schema violations instead of passing an invalid response through. `llm_client.parse_and_clean_json` parses and normalizes model JSON, but the final API-level schema enforcement is in `app.py`; the parser itself does not call `validate_clinical_response`.
+
+### Provenance verification
+
+There is an actual source-checking function: `llm_client.verify_response_provenance`. Its contract is:
+
+> `"Return provenance errors for citations and evidence in a model response."`
+
+For a grounded response, the function builds the set of retrieved `chunk_id` values and source document/page locations. It then requires at least one citation, rejects a citation whose `chunk_id` is not among the retrieved chunks, rejects a document/page citation not present in the retrieved locations, requires at least one evidence snippet, and checks that every normalized evidence snippet is contained in the normalized text of at least one retrieved chunk. It also rejects an empty grounded answer. Abstain responses intentionally bypass these grounded citation/evidence requirements.
+
+`generation.answer_question` invokes this function after a live LLM response is parsed. Any provenance error raises an exception, so the model response cannot be returned as a successful grounded answer. The contract tests verify both sides: a matching citation/evidence pair is accepted, while a fabricated source and fabricated evidence are rejected.
+
+### Abstention and refusal behavior
+
+The exact code conditions are:
+
+1. If retrieval returns no chunks, `_abstain` returns `status="abstain"`, empty answer/evidence/citations, `confidence="insufficient"`, `generation_method="none"`, and the reason `No relevant guideline evidence retrieved.`
+2. Otherwise, `generation.py` takes the preserved dense score from the first result and abstains when `top_score < config.OUT_OF_SCOPE_MAX_SCORE`. The current configured threshold is **0.65**. The reason includes both the observed score and the threshold.
+3. If the live LLM path is unavailable or fails, production behavior abstains when `ALLOW_EXTRACTIVE_FALLBACK` is false, with the reason `Live LLM generation is unavailable and extractive fallback is disabled.`
+
+The code does not use a keyword blacklist as its main refusal mechanism. A reranker score is also not used as the scope signal; the dense score is deliberately retained for this guard.
+
+### Refusal categories actually tested
+
+The saved 30-question test construction in `evaluation_set_30.py` tests these ten negative categories: breast-cancer screening, community-acquired pneumonia/antibiotics, type 1 diabetes insulin, COVID booster guidance, appendicitis in pregnancy, pediatric asthma dosing, antidepressant choice in older adults, stage 4 chronic kidney disease/dialysis, breast-cancer chemotherapy, and acute ischemic stroke. The six hard-negative cases in `evaluation_set_robustness.py` separately cover diabetes, infectious disease, surgery, pediatric respiratory disease, psychiatry, and nephrology. `verify_day3_dod.py` directly checks a breast-cancer screening refusal, while `tests/test_contracts.py` checks abstention semantics and that abstentions need no citations.
+
+The expanded Day 4 test data also contains additional categories such as anticoagulation, statins, heart failure, pulmonary embolism, vaccines, hypothyroidism, unrelated wellness/history/programming questions, and an explicit unsafe prompt-injection request. Those are not all part of the 30-question benchmark, so they should not be described as Day 3 refusal coverage. Prompt-injection behavior is therefore not comprehensively tested by the Day 3 unit tests or the saved 30-question benchmark.
+
+### Live LLM integration and fallback
+
+The live path is genuinely wired. `llm_client.call_nim_chat` sends an HTTP chat-completions request to the NVIDIA NIM endpoint, defaulting to `https://integrate.api.nvidia.com/v1/chat/completions`, with default model `meta/llama-3.1-8b-instruct`. It requires `NV_API_KEY`, supports configurable endpoint/model variables, uses a 30-second default timeout, and retries HTTP 429/5xx responses according to `LLM_MAX_ATTEMPTS` and `LLM_BACKOFF_SECONDS`.
+
+When `NV_API_KEY` is absent, the live call is skipped. When it is present but the request, JSON parsing, schema path, or provenance check fails, `answer_question` logs the failure and falls through to the extractive fallback. That fallback selects one sentence from the retrieved chunks using token overlap with the question and returns `generation_method="extractive_fallback"` with citations and evidence excerpts. In development, `ALLOW_EXTRACTIVE_FALLBACK` defaults to enabled; in production it defaults to disabled, so unavailable or failed live generation becomes a schema-valid abstention instead of an extractive answer.
+
+The resulting system therefore has three real output paths: grounded live LLM output, grounded extractive fallback in non-production, and abstention. The fallback is not true generative synthesis and may omit clinically important qualifiers, which is why production disables it by default.
+
+## 4. Phase 4 — Production Readiness & Testing
+
+### Test-suite result
+
+`PRODUCTION_READY.md` specifies this command as the project test-suite check:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+I ran the equivalent command from the project root using `.venv\\Scripts\\python.exe`. The actual result was **15 tests run, 15 passed, 0 failed, 0 errors**, with exit code 0 and final status `OK`.
+
+### Implemented according to `PRODUCTION_READY.md`
+
+The documented implemented controls are:
+
+- WSGI entrypoint and Gunicorn deployment.
+- Pinned direct dependencies in `requirements.lock`.
+- Redis-backed shared rate limiting, required in production.
+- API-key authentication for protected endpoints.
+- Explicit production CORS, request-size limits, and fail-fast configuration.
+- Liveness (`/api/live`) and readiness (`/api/health`) probes.
+- Request IDs, security headers, and audit metadata without question text or response content.
+- Strict response schema and evidence provenance checks.
+- Dockerfile and Docker Compose deployment with Redis healthchecks.
+- Contract tests covering authentication, probes, request limits, provenance, and retrieval score semantics.
+
+### Required before deployment according to `PRODUCTION_READY.md`
+
+The document states that the following are still required before deployment:
+
+- Build a clean Python 3.11 environment from `requirements.lock`.
+- Store `NV_API_KEY`, `API_AUTH_TOKEN`, and Redis credentials in a secret manager.
+- Put the API behind TLS and a reverse proxy with timeouts and network policy.
+- Use managed/private Redis with authentication and backups.
+- Configure centralized log retention and alerting for 5xx, 401/429, latency, readiness failures, and LLM failures.
+- Complete clinician-reviewed evaluation for prompt injection, near-domain questions, abstention behavior, and citation correctness.
+- Create a provenance manifest for indexed documents with checksums, source URLs, dates, and licensing information.
+- Exercise disaster recovery for the vector index and Redis data.
+
+The production document also lists `python -m pip check`, Gunicorn startup, and Docker Compose health checks as operational verification commands. Those are deployment checks, not substitutes for the unavailable unittest result above.
+
+## 5. Full Metrics Appendix
+
+The table below consolidates the numeric values used in Sections 0–4. “Run output” means a command was executed against the current workspace; saved JSON values are taken from the named artifact. A row marked “not completed” is intentionally not a numeric result.
+
+| Metric | Value | K/Setting | Exact source |
+| --- | ---: | --- | --- |
+| Active PDF files | 2 | `data/*.pdf` | `load_pdfs` count run; `config.py` |
+| Extracted pages, total | 104 | Current corpus | `load_pdfs` count run |
+| Pages in pharmacological guideline | 61 | Current corpus | `load_pdfs` count run |
+| Pages in HEARTS PDF | 43 | Current corpus | `load_pdfs` count run |
+| Persisted indexed chunks | 191 | Chroma `clinical_guidelines` | Chroma count run; `benchmark_30_results.json` (`corpus_chunks`) |
+| Pharmacological-guideline chunks | 114 | Current index | Chroma metadata count run |
+| HEARTS chunks | 77 | Current index | Chroma metadata count run |
+| Pages represented by indexed chunks | 100 | 58 + 42 | Chroma metadata count run |
+| Historical reported chunk count | 190 | Older Day 1 claim | `DAY1_REPORT.md` |
+| Historical reported HEARTS chunk count | 76 | Older Day 1 claim | `DAY1_REPORT.md` |
+| Chunk size | 500 tokens | `CHUNK_SIZE` | `config.py` |
+| Chunk overlap | 75 tokens | `CHUNK_OVERLAP` | `config.py` |
+| Character/token approximation | 4 characters/token | `CHARS_PER_TOKEN` | `config.py` |
+| Approximate splitter target | 2,000 characters | 500 x 4 | `config.py`; `ingest.py` |
+| Approximate overlap in characters | 300 characters | 75 x 4 | `config.py`; `ingest.py` |
+| Active embedding model | `BAAI/bge-small-en-v1.5` | Local FastEmbed | `config.py`; `ingest.py` |
+| Original positive questions | 10 | `EVAL_SET` | `evaluation_set.py` |
+| Original negative controls | 2 | `EVAL_SET` | `evaluation_set.py` |
+| Primary benchmark questions | 10 | K=3 benchmark | `evaluation_set_30.py`; `benchmark_30_results.json` |
+| Held-out paraphrase questions | 10 | K=3 benchmark | `evaluation_set_robustness.py`; `benchmark_30_results.json` |
+| Negative benchmark questions | 10 | K=3 benchmark | `evaluation_set_30.py`; `benchmark_30_results.json` |
+| Total benchmark questions | 30 | K=3 | `benchmark_30_results.json` |
+| Tested K values | 1, 3, 4, 5, 10 | Dense evaluation | `config.py`; `evaluate_retrieval.py` |
+| Dense Precision@1 | 80.00% | K=1 | `evaluate_retrieval.py` run output |
+| Dense PageRecall@1 | 80.00% | K=1 | `evaluate_retrieval.py` run output |
+| Dense Precision@3 | 56.67% | K=3 | `evaluate_retrieval.py` run output; `benchmark_30_results.json` |
+| Dense PageRecall@3 | 100.00% | K=3 | `evaluate_retrieval.py` run output; `benchmark_30_results.json` |
+| Dense DocHit@3 | 100.00% | K=3 | `evaluate_retrieval.py` run output; `benchmark_30_results.json` |
+| Dense Precision@4 | 50.00% | K=4 | `evaluate_retrieval.py` run output |
+| Dense Precision@5 | 40.00% | K=5 | `evaluate_retrieval.py` run output |
+| Dense Precision@10 | 25.00% | K=10 | `evaluate_retrieval.py` run output |
+| Dense mean latency at K=1 | 43.4 ms | K=1 | `evaluate_retrieval.py` run output |
+| Dense mean latency at K=3 | 35.5 ms | K=3 | `evaluate_retrieval.py` run output |
+| Dense mean latency at K=4 | 32.6 ms | K=4 | `evaluate_retrieval.py` run output |
+| Dense mean latency at K=5 | 40.4 ms | K=5 | `evaluate_retrieval.py` run output |
+| Dense mean latency at K=10 | 35.8 ms | K=10 | `evaluate_retrieval.py` run output |
+| bge-small Precision@3 in embedding run | 56.67% | 104 pages, 191 chunks | `evaluate_embeddings.py` run output |
+| bge-small PageRecall@3 in embedding run | 100.00% | 10 positives | `evaluate_embeddings.py` run output |
+| bge-small mean latency in embedding run | 47.7 ms | K=3 | `evaluate_embeddings.py` run output |
+| MiniLM Precision@3 in embedding run | 30.00% | K=3 | `evaluate_embeddings.py` run output |
+| MiniLM PageRecall@3 in embedding run | 60.00% | K=3 | `evaluate_embeddings.py` run output |
+| MiniLM mean latency in embedding run | 8.6 ms | K=3 | `evaluate_embeddings.py` run output |
+| bge-base completed metric | Not completed | K=3 | `evaluate_embeddings.py` run status |
+| Dense primary Precision@3 | 56.67% | 10 questions | `benchmark_30_results.json` |
+| Dense primary PageRecall@3 | 100.00% | 10 questions | `benchmark_30_results.json` |
+| Dense paraphrase Precision@3 | 43.33% | 10 questions | `benchmark_30_results.json` |
+| Dense paraphrase PageRecall@3 | 80.00% | 10 questions | `benchmark_30_results.json` |
+| Dense negative abstain pass rate | 100.00% | 10 questions | `benchmark_30_results.json` |
+| BM25 primary Precision@3 | 43.33% | 10 questions | `benchmark_30_results.json` |
+| BM25 primary PageRecall@3 | 90.00% | 10 questions | `benchmark_30_results.json` |
+| BM25 paraphrase Precision@3 | 36.67% | 10 questions | `benchmark_30_results.json` |
+| BM25 paraphrase PageRecall@3 | 80.00% | 10 questions | `benchmark_30_results.json` |
+| BM25 negative abstain pass rate | Not available | No dense score | `benchmark_30_results.json` |
+| Equal-weight RRF primary Precision@3 | 60.00% | Weights 1.0/1.0 | `benchmark_30_results.json` |
+| Equal-weight RRF paraphrase Precision@3 | 46.67% | Weights 1.0/1.0 | `benchmark_30_results.json` |
+| Equal-weight RRF paraphrase PageRecall@3 | 100.00% | Weights 1.0/1.0 | `benchmark_30_results.json` |
+| Equal-weight RRF negative abstain pass rate | 100.00% | Weights 1.0/1.0 | `benchmark_30_results.json` |
+| Weighted RRF primary Precision@3 | 60.00% | Weights 1.5/1.0 and 2.0/1.0 | `benchmark_30_results.json` |
+| Weighted RRF paraphrase Precision@3 | 43.33% | Weights 1.5/1.0 and 2.0/1.0 | `benchmark_30_results.json` |
+| Sparse-weight RRF primary Precision@3 | 53.33% | Weights 1.0/1.5 | `benchmark_30_results.json` |
+| Sparse-weight RRF paraphrase Precision@3 | 46.67% | Weights 1.0/1.5 | `benchmark_30_results.json` |
+| Query-expansion RRF negative abstain pass rate | 90.00% | Equal RRF + expansion | `benchmark_30_results.json` |
+| Query-expansion RRF primary Precision@3 | 56.67% | Equal RRF + expansion | `benchmark_30_results.json` |
+| Page-diversified RRF primary Precision@3 | 53.33% | One result/page | `benchmark_30_results.json` |
+| Page-diversified RRF negative abstain pass rate | 100.00% | One result/page | `benchmark_30_results.json` |
+| Chunk-ablation configurations | 3 | 300/40, 500/75, 700/100 | `chunk_ablation.py` |
+| Chunk-ablation completed result | Not completed | Precision@5 intended | `chunk_ablation.py` run status |
+| Confidence threshold | 0.70 | `CONFIDENCE_THRESHOLD` | `config.py`; `retrieval.py` |
+| Out-of-scope threshold | 0.65 | `OUT_OF_SCOPE_MAX_SCORE` | `config.py`; `generation.py` |
+| Default top K | 3 | `TOP_K` | `config.py` |
+| Reranker fetch K | 10 | Dense-first reranker | `config.py`; `dense_reranker.py` |
+| LLM request timeout | 30 seconds | Default `LLM_TIMEOUT` | `llm_client.py`; `generation.py` |
+| Contract tests passed | 15 | 15 run, 0 failed, 0 errors | `python -m unittest discover -s tests -v` |
+| Required schema fields | 5 | `status`, `answer`, `evidence`, `citations`, `confidence` | `schema/response_schema.json` |
+
+## 6. Known Limitations and Trade-offs
+
+### Small and narrow corpus
+
+The active corpus is only **2 WHO hypertension PDFs**, totaling **104 extracted pages** and **191 indexed chunks**. This narrow scope makes source traceability manageable and supports a clear abstention boundary, but it also limits generalization. A strong result on this corpus does not establish performance on other diseases, institutions, guideline publishers, populations, or larger indexes. The current benchmark is correspondingly a retrieval validation exercise, not external clinical validation.
+
+### Limited evaluation coverage
+
+The saved benchmark contains **20 positive questions** and **10 negative controls**. Its positives cover reviewed primary questions and held-out paraphrases, while its negatives cover several adjacent medical domains. That is useful anti-overfitting evidence, but it is still a small, fixed test set. Prompt-injection, near-domain, citation, and abstention coverage is broader in the expanded Day 4 materials than in the Day 3 unit tests and 30-question benchmark, and the production checklist still requires clinician-reviewed evaluation. The failed or incomplete current-run experiments also mean that bge-base, chunk-size ablation, and FlashRank reranking do not have complete current metrics to support a decision.
+
+### External LLM dependency
+
+Live generation depends on the NVIDIA NIM chat-completions API, an `NV_API_KEY`, network availability, endpoint availability, model availability, and a response that can be parsed and provenance-checked. The client retries selected 429 and 5xx failures, but retries do not remove the dependency or guarantee availability. External inference also introduces operational cost, latency, and a need to manage the API credential as a secret. The production checklist explicitly requires secret management, TLS, monitoring, and clinician-reviewed safety evaluation before deployment.
+
+### Extractive fallback is not true generation
+
+When the live LLM is absent or fails, development mode can return a grounded response from `_select_best_sentence`: it selects one sentence from retrieved chunks using token overlap with the question. This is useful for local operation and deterministic fallback, but it is extractive rather than generative. It can omit qualifiers, combine no new synthesis, and fail to express the complete clinical context needed for a safe recommendation. Production therefore disables extractive fallback by default and abstains when live generation is unavailable.
+
+### Retrieval-quality trade-offs
+
+K=3 is selected because it reached 100% page recall and document hit on the current positive set while retaining more precision than larger K values. It does not make every retrieved chunk relevant: current Dense Precision@3 is 56.67% on the 10-question K evaluation and on the primary portion of the saved 30-question benchmark. Equal-weight RRF improves saved benchmark quality to 60.00% primary Precision@3 and 46.67% paraphrase Precision@3, but RRF remains opt-in at runtime and its rank score is not a calibrated probability. The system must keep using `dense_score` for the abstention guard.
+
+### Safety boundary is score-based
+
+The main abstention boundary is a top dense relevance score below **0.65**, not a full clinical reasoning or intent-classification system. The benchmarked negatives passed this guard, but query expansion reduced negative-control abstention to 90%, demonstrating that retrieval changes can affect safety behavior even when positive recall improves. This is a deliberate trade-off: a simple, inspectable guard is easier to audit, but it cannot by itself guarantee that every clinically unsafe or adversarial question will be rejected.
+
+### Operational readiness is incomplete
+
+The code includes authentication, rate limiting, request limits, security headers, health probes, schema checks, provenance checks, Docker/Gunicorn paths, and audit metadata. The project documentation still requires production infrastructure and governance work: managed Redis, TLS/reverse proxy, secret storage, centralized monitoring, clinician-reviewed testing, source provenance manifests, and disaster recovery. The current contract suite passed 15/15, but broader clinical and deployment validation remains required.
+
+## 7. Anticipated Committee Questions and Honest Answers
+
+### Retrieval quality
+
+**Question:** How good is retrieval, and why should the committee trust K=3?
+
+**Answer:** On the current 10-question positive K evaluation, Dense at K=3 achieved 56.67% Precision@3, 100% PageRecall@3, and 100% DocHit@3. K=3 was selected as the smallest tested K reaching both 100% page recall and 100% document hit while retaining more precision than K=4, K=5, and K=10. On the saved 30-question benchmark, equal-weight RRF improved primary Precision@3 to 60.00% and paraphrase PageRecall@3 to 100.00%. These are useful retrieval measurements on this corpus, not clinical validation.
+
+### Citation accuracy
+
+**Question:** Can the system detect a fabricated citation or evidence snippet?
+
+**Answer:** There is a concrete verifier, `verify_response_provenance`, that checks citation chunk IDs or document/page locations against retrieved chunks, requires citations and evidence for grounded responses, checks each evidence snippet against retrieved text, and rejects an empty grounded answer. `tests/test_contracts.py` includes both an accepted matching citation case and a fabricated source/evidence rejection case. This establishes a tested contract, but broader clinician-reviewed citation evaluation still needs further testing.
+
+### Chunking decisions
+
+**Question:** Why use 500-token chunks with 75-token overlap?
+
+**Answer:** The active configuration uses 500 tokens, 75-token overlap, and a 4-characters-per-token approximation. The splitter prioritizes paragraph, line, sentence, space, and character boundaries, while cleaning repeated headers and orphan page numbers first. This preserves page metadata and gives stable chunk IDs. The intended ablation compares 300/40, 500/75, and 700/100, but the current ablation did not complete, so a measured claim that 500/75 is globally optimal would be unjustified. The honest answer is that 500/75 is the active configuration and still needs a completed current ablation for a stronger optimization claim.
+
+### Test-set construction methodology
+
+**Question:** Were the evaluation labels circular or tuned from retrieval output?
+
+**Answer:** The positive labels in `evaluation_set.py` specify expected documents and reviewed source pages, and the file states that they are grounded in indexed PDF text rather than circular retrieval output. The 30-question benchmark separates 10 primary questions, 10 differently worded held-out paraphrases, and 10 negatives. This is a reasonable anti-overfitting design for an engineering benchmark. It is still small and not an independently reviewed external clinical test set, so the honest answer is that further clinician-reviewed and externally sourced evaluation is needed.
+
+### Refusal logic
+
+**Question:** How does the system decide not to answer?
+
+**Answer:** It abstains when no chunks are retrieved or when the top preserved dense score is below the configured 0.65 out-of-scope threshold. If live generation is unavailable or fails, production abstains because extractive fallback is disabled there. The 30-question benchmark achieved 100% negative-control abstention for Dense and equal-weight RRF, while query expansion reduced that result to 90%. The guard is auditable and tested, but score-based refusal alone cannot guarantee rejection of every adversarial or near-domain question.
+
+### Security and privacy
+
+**Question:** What protections exist, and does the system claim to be deployment-safe?
+
+**Answer:** The documented implementation includes API-key authentication, production CORS checks, request-size limits, rate limiting, liveness/readiness probes, request IDs, security headers, audit metadata that excludes question text and response content, schema validation, and provenance checks. The production checklist still requires TLS and reverse-proxy policy, secret-manager storage for API and Redis credentials, managed/private Redis, centralized monitoring, and clinician-reviewed safety evaluation. Therefore, the honest answer is that the code has production-oriented controls, but it is not yet cleared for unsupervised patient care or deployment.
+
+### Scalability
+
+**Question:** Will the current architecture scale to a much larger corpus or production load?
+
+**Answer:** The current evidence is limited to 191 chunks. Dense retrieval is persisted in Chroma, and the hybrid path builds a BM25 index over the chunks; Redis-backed rate limiting is available for shared production deployment. However, no verified large-corpus benchmark, capacity test, disaster-recovery exercise, or production load result is present in the current evidence. The honest answer is that scalability still needs further testing, especially for index growth, concurrent requests, external LLM latency, and shared infrastructure failure.
+
+## 8. Documentation Consistency Check
+
+This section records every contradiction or unsupported historical claim identified while writing Sections 1–4. The current code, current `data/` directory, current Chroma collection, and genuinely saved result files take precedence.
+
+### Contradictions with `DAY1_REPORT.md`
+
+1. **Total chunk count:** `DAY1_REPORT.md` repeatedly reports 190 chunks, including its ingestion output and final summary. The current `load_pdfs`/`chunk_documents` path produces 191 chunks, and the persisted Chroma collection contains 191.
+2. **HEARTS chunk count:** the report lists 76 chunks for `WHO-NMH-NVI-18.2-eng.pdf`; current Chroma metadata contains 77. The first guideline remains 114 chunks.
+3. **Number of source documents:** one Day 1 passage says all 7 documents were entered in `data/`; the current directory contains exactly 2 PDF files, the two active documents used by the code and evaluation sets.
+4. **Stale filename in examples:** the report uses `WHO_Hypertension_Guideline_2021.pdf` in a chunk ID and retrieval example. That filename is absent from the current `data/` directory and current indexed metadata. The current active filenames are `Guideline for the pharmacological treatment of hypertension in adults.pdf` and `WHO-NMH-NVI-18.2-eng.pdf`.
+5. **Index-writing API description:** the report describes the current write as `Chroma.from_documents` with IDs. Current `ingest.py` constructs a `Chroma` instance and calls `add_documents` in batches with explicit IDs.
+6. **Offline embedding claim:** the report describes FastEmbed as working “100% without internet.” Current `ingest.py` documents that the first call downloads and caches the model, so a clean environment requires network access or a pre-populated cache. The model does not require an API key, but that is different from requiring no network at first use.
+7. **Unverified embedding dimension:** the report states that the model produces 384 dimensions, but this dimension is not established by the active `config.py` or `ingest.py` code used for the report. It was not used as a verified metric in this report.
+
+### Contradictions with `DAY2_REPORT.md`
+
+8. **Corpus size carried into Day 2:** the report uses 190 chunks; current code and the saved 30-question benchmark use 191.
+9. **Current Dense Precision@3:** the report claims 63.3%; the current `evaluate_retrieval.py` run produced 56.67%, and `benchmark_30_results.json` records 56.67% for Dense primary Precision@3.
+10. **Current latency:** the report presents approximately 8 ms, including 8.3 ms at K=3; the current K=3 run produced 35.5 ms mean latency. The saved 30-question benchmark also does not support treating the old 8 ms value as the current runtime result.
+11. **Negative-control denominator:** the report says 100% abstention over 8/8 controls. The current saved 30-question benchmark has 10 negative controls, and the original current `EVAL_SET` has 2; 8 is not the denominator for the current 30-question artifact.
+12. **Embedding benchmark values:** the report claims bge-base 50.0%/80.0% and MiniLM 23.3%/60.0%. The current embedding run completed bge-small at 56.67%/100.00% and MiniLM at 30.00%/60.00%, but produced no completed bge-base metric. The old bge-base and MiniLM values are therefore not current-run evidence.
+13. **Completed chunk ablation:** the report says 500/75 was retained after ablation and that cleaning increased the index from 180 to 190 chunks. The current `chunk_ablation.py` run did not complete and produced no result artifact; the current index is 191 chunks. The active 500/75 setting is verified as configuration, not as the winner of a completed current ablation.
+14. **Reranker benchmark numbers:** the report lists architecture/reranker latency and quality claims such as approximately 716 ms and 80% paraphrase recall. The current saved benchmark contains no completed reranker metrics, and `BENCHMARK_30_REPORT.md` records that the FlashRank attempt stalled after model initialization. These old reranker numbers are not used as current evidence.
+15. **Interpretation of the paraphrase gap:** the report calls the 100% to 80% recall gap “healthy” and says it proves generalization. The measurements establish a gap; they do not by themselves prove that the gap is healthy or establish clinical generalization.
+
+### Contradictions or unsupported claims in `DAY3_REPORT.md`
+
+16. **Validation totals:** the older report states Day 1 passed 12/12, Day 2 passed 21/21, and Day 3 passed 10/10. Those historical totals were not used as current results. The current contract suite was independently run and verified at 15/15 passed, 0 failed, 0 errors; that does not validate the older Day 1/Day 2/Day 3 totals.
+17. **Specific refusal example:** the report cites “spotted fever in alpacas” as its out-of-scope example. The current `verify_day3_dod.py` uses breast-cancer screening, and the saved 30-question benchmark contains the listed medical-domain negatives but no spotted-fever case. That specific case is not verified as tested in the current test files.
+18. **Claim that all live outputs were executed and saved:** the code genuinely wires NVIDIA NIM, but no current live API execution result was used in this report, and the external API requires a key and network. The historical statement that all live outputs were fully executed and saved is therefore not independently verified here.
+19. **Location of schema enforcement:** the report broadly says LLM JSON responses are validated using `Draft7Validator`. The current `llm_client.py` parser normalizes JSON but does not itself invoke the validator; final response validation is explicitly performed in `app.py`. The capability exists, but the historical description omits the controlling location and overstates parser-level enforcement.
+20. **Generation-path description:** the report describes Day 3 as selecting the strongest sentence or chunk. Current `generation.py` does that only for the extractive fallback; when `NV_API_KEY` is configured, the primary path calls the live LLM and then verifies its provenance. The report does not distinguish these two paths clearly.
+21. **Deployment implication:** the report concludes the project is “complete and verified,” while `PRODUCTION_READY.md` explicitly lists clinician-reviewed evaluation, secret management, TLS/reverse proxy, managed Redis, provenance manifests, monitoring, and disaster recovery as still required. The current evidence supports a production-oriented implementation, not clinical deployment readiness.
+
+These inconsistencies are preserved rather than silently corrected in the older reports. The report generated here uses the current code and saved artifacts as its source of truth.
+
+**Report complete.** Final file: [FINAL_PRESENTATION_REPORT.txt](FINAL_PRESENTATION_REPORT.txt)
