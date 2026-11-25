@@ -268,10 +268,9 @@ The failed negative controls remain visible and block a production-ready claim.
 │   ├── day2/Day2_Retrieval_Optimization.ipynb
 │   ├── Day3/Task3_Grounded_Generation.ipynb
 │   └── day 4/Task4_Safety_Evaluation.ipynb
-├── Task3_Grounded_Generation.ipynb       # Live LLM Grounded Generation Notebook
-├── DAY1_REPORT.md                        # Day 1 Technical Report
-├── DAY2_REPORT.md                        # Day 2 Retrieval & Ablation Report
-├── DAY3_REPORT.md                        # Day 3 Live LLM Generation & Schema Report
+├── docs/project-history/DAY1_REPORT.md                        # Day 1 Technical Report
+├── docs/project-history/DAY2_REPORT.md                        # Day 2 Retrieval & Ablation Report
+├── docs/project-history/DAY3_REPORT.md                        # Day 3 Live LLM Generation & Schema Report
 ├── ingest.py                             # Document loading, chunking & Chroma indexer
 ├── query.py                              # Query & live decision support interface
 ├── retrieval.py                          # Citation wrapper & clinical view formatting

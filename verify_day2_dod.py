@@ -39,7 +39,7 @@ def main() -> int:
         "evaluate_robustness.py",
         "evaluation_set.py",
         "evaluation_set_robustness.py",
-        "DAY2_REPORT.md",
+        "docs/project-history/DAY2_REPORT.md",
     ]
     for name in required:
         if (ROOT / name).exists():
