@@ -9,6 +9,8 @@ pinned: false
 
 # AI Clinical Decision Support Lite
 
+> **Team project.** Built by team Insight AI. Upstream: [MohamedAwadMoneer/ai-clinical-decision-support](https://github.com/MohamedAwadMoneer/ai-clinical-decision-support) (MIT). See [ATTRIBUTION.md](ATTRIBUTION.md) for credit and individual contributions.
+
 [![CI](https://github.com/MohamedAwadMoneer/ai-clinical-decision-support/actions/workflows/ci.yml/badge.svg)](https://github.com/MohamedAwadMoneer/ai-clinical-decision-support/actions/workflows/ci.yml)
 [![Python 3.11](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)

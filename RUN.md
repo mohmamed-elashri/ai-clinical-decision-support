@@ -8,7 +8,7 @@
 3. A valid NVIDIA NIM API key in your `.env` file:
 
 ```dotenv
-NV_API_KEY=nvapi-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+NV_API_KEY=your_nvidia_nim_api_key_here
 NV_LLM_ENDPOINT=https://integrate.api.nvidia.com/v1/chat/completions
 NV_MODEL=meta/llama-3.1-8b-instruct
 ```
