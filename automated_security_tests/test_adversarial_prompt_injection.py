@@ -673,49 +673,82 @@ class TestAPILevelSecurity:
                 with pytest.raises(requests.ConnectionError):
                     llm_client.call_nim_chat("prompt")
 
-    def test_route_intent_returns_yes_on_api_exception(self):
-        """
-        Defense: route_intent must fail OPEN (return 'yes', assume in-scope) when
-        the NIM API is unavailable, so legitimate queries still get processed.
-        """
-        with patch.dict(os.environ, {"NVIDIA_API_KEY": "key"}):
-            with patch("llm_client.requests.post", side_effect=Exception("API down")):
-                result = llm_client.route_intent("What is the BP target?")
-        assert result == "yes"
+    # The original four tests here called llm_client.route_intent and
+    # llm_client.rewrite_query. Neither function has ever existed in this
+    # project, so they were replaced by tests of the behaviour the pipeline
+    # actually has (see TEST_TRIAGE.md). generation.answer_question is the real
+    # place where out-of-scope queries and LLM outages are handled.
 
-    def test_route_intent_returns_no_for_out_of_scope(self):
-        """
-        Defense: route_intent correctly returns 'no' when NIM classifies a query
-        as out-of-scope, which should cause answer_question to return abstain.
-        """
-        no_resp = _nim_response("no")
-        with patch.dict(os.environ, {"NVIDIA_API_KEY": "key"}):
-            with patch("llm_client.requests.post", return_value=no_resp):
-                result = llm_client.route_intent("What is the weather today?")
-        assert result == "no"
+    @staticmethod
+    def _chunk(score):
+        return {
+            "rank": 1, "text": "Target blood pressure is below 140/90 mmHg.",
+            "document_name": "who.pdf", "page_number": 3, "section": None,
+            "chunk_id": "c1", "score": score, "dense_score": score,
+            "confidence": "confident",
+        }
 
-    def test_rewrite_query_returns_original_on_api_failure(self):
+    def test_out_of_scope_query_abstains_without_calling_the_llm(self):
         """
-        Defense: rewrite_query must fall back to the original question if the NIM
-        API call fails — the pipeline continues rather than crashing.
+        Defense: a query whose best retrieval score is below the out-of-scope
+        threshold must abstain and must never reach the LLM.
         """
-        original = "What blood pressure target is safe for elderly patients?"
-        with patch.dict(os.environ, {"NVIDIA_API_KEY": "key"}):
-            with patch("llm_client.requests.post", side_effect=Exception("timeout")):
-                result = llm_client.rewrite_query(original)
-        assert result == original
+        import generation
+        low = config.OUT_OF_SCOPE_MAX_SCORE - 0.1
+        with patch.object(generation, "retrieve_with_citation", return_value=[self._chunk(low)]):
+            with patch.dict(os.environ, {"NVIDIA_API_KEY": "key"}):
+                with patch("llm_client.requests.post") as post:
+                    result = generation.answer_question(object(), "What is the weather today?")
+        assert result["status"] == "abstain"
+        assert result["generation_method"] == "none"
+        post.assert_not_called()
 
-    def test_rewrite_query_returns_original_when_no_api_key(self):
+    def test_llm_outage_fails_closed_when_extractive_fallback_disabled(self):
         """
-        Defense: rewrite_query returns the original question unchanged when
-        NVIDIA_API_KEY is not configured — no exception, graceful degradation.
+        Defense: when the NIM API is down and the extractive fallback is off,
+        the system must abstain (fail closed) rather than invent an answer.
         """
-        original = "What is first-line treatment for hypertension?"
-        env = {k: v for k, v in os.environ.items()
-               if k not in ("NVIDIA_API_KEY", "NV_API_KEY")}
-        with patch.dict(os.environ, env, clear=True):
-            result = llm_client.rewrite_query(original)
-        assert result == original
+        import generation
+        high = config.OUT_OF_SCOPE_MAX_SCORE + 0.2
+        with patch.object(generation, "retrieve_with_citation", return_value=[self._chunk(high)]):
+            with patch.object(config, "ALLOW_EXTRACTIVE_FALLBACK", False):
+                with patch.dict(os.environ, {"NVIDIA_API_KEY": "key"}):
+                    with patch("llm_client.requests.post", side_effect=Exception("API down")):
+                        result = generation.answer_question(object(), "BP target?")
+        assert result["status"] == "abstain"
+        assert result["answer"] == ""
+
+    def test_llm_outage_uses_labelled_extractive_fallback_when_enabled(self):
+        """
+        Defense: with the explicit opt-in, an LLM outage degrades to an
+        extractive answer that is labelled as such and carries citations.
+        """
+        import generation
+        high = config.OUT_OF_SCOPE_MAX_SCORE + 0.2
+        with patch.object(generation, "retrieve_with_citation", return_value=[self._chunk(high)]):
+            with patch.object(config, "ALLOW_EXTRACTIVE_FALLBACK", True):
+                with patch.dict(os.environ, {"NVIDIA_API_KEY": "key"}):
+                    with patch("llm_client.requests.post", side_effect=Exception("timeout")):
+                        result = generation.answer_question(object(), "BP target?")
+        assert result["status"] == "grounded"
+        assert result["generation_method"] == "extractive_fallback"
+        assert result["citations"]
+
+    def test_missing_api_key_never_calls_the_llm(self):
+        """
+        Defense: with no NVIDIA key configured, no network call is attempted;
+        the pipeline abstains (fallback disabled) with no exception.
+        """
+        import generation
+        high = config.OUT_OF_SCOPE_MAX_SCORE + 0.2
+        env = {k: v for k, v in os.environ.items() if k not in ("NVIDIA_API_KEY", "NV_API_KEY")}
+        with patch.object(generation, "retrieve_with_citation", return_value=[self._chunk(high)]):
+            with patch.object(config, "ALLOW_EXTRACTIVE_FALLBACK", False):
+                with patch.dict(os.environ, env, clear=True):
+                    with patch("llm_client.requests.post") as post:
+                        result = generation.answer_question(object(), "BP target?")
+        assert result["status"] == "abstain"
+        post.assert_not_called()
 
     def test_nim_request_uses_bearer_token_authentication(self):
         """
