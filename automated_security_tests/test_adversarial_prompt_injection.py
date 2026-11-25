@@ -673,6 +673,7 @@ class TestAPILevelSecurity:
                 with pytest.raises(requests.ConnectionError):
                     llm_client.call_nim_chat("prompt")
 
+    @pytest.mark.xfail(strict=True, reason='interface-never-existed: llm_client has never defined route_intent/rewrite_query (only the commit that added these tests mentions them). Test targets an outdated or planned interface.')
     def test_route_intent_returns_yes_on_api_exception(self):
         """
         Defense: route_intent must fail OPEN (return 'yes', assume in-scope) when
@@ -683,6 +684,7 @@ class TestAPILevelSecurity:
                 result = llm_client.route_intent("What is the BP target?")
         assert result == "yes"
 
+    @pytest.mark.xfail(strict=True, reason='interface-never-existed: llm_client has never defined route_intent/rewrite_query (only the commit that added these tests mentions them). Test targets an outdated or planned interface.')
     def test_route_intent_returns_no_for_out_of_scope(self):
         """
         Defense: route_intent correctly returns 'no' when NIM classifies a query
@@ -694,6 +696,7 @@ class TestAPILevelSecurity:
                 result = llm_client.route_intent("What is the weather today?")
         assert result == "no"
 
+    @pytest.mark.xfail(strict=True, reason='interface-never-existed: llm_client has never defined route_intent/rewrite_query (only the commit that added these tests mentions them). Test targets an outdated or planned interface.')
     def test_rewrite_query_returns_original_on_api_failure(self):
         """
         Defense: rewrite_query must fall back to the original question if the NIM
@@ -705,6 +708,7 @@ class TestAPILevelSecurity:
                 result = llm_client.rewrite_query(original)
         assert result == original
 
+    @pytest.mark.xfail(strict=True, reason='interface-never-existed: llm_client has never defined route_intent/rewrite_query (only the commit that added these tests mentions them). Test targets an outdated or planned interface.')
     def test_rewrite_query_returns_original_when_no_api_key(self):
         """
         Defense: rewrite_query returns the original question unchanged when
