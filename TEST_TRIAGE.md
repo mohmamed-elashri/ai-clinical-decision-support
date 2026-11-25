@@ -1,19 +1,23 @@
 # Triage of the 7 failing security tests
 
-`automated_security_tests/` was added in commit 5eaac58 and the tests were generated with an AI assistant (IBM Bob; see `bob_sessions/`). On `main` the suite ran 117 passed, 7 failed. Nothing was deleted and no assertion was changed. Each failing test is now marked `xfail(strict=True)` with the reason below. If someone implements the missing behaviour, the strict marker turns the test into a failure until the mark is removed, so it cannot be forgotten.
+`automated_security_tests/` was added in commit 5eaac58 and the tests were generated with an AI assistant (IBM Bob; see `bob_sessions/`). On `main` the suite ran 117 passed, 7 failed. Each failure was investigated and classified. No assertion was weakened, no function was added to satisfy a test, and no failure is reported as a pass.
 
-| Test | Classification | Evidence |
+| Test (original) | Classification | Resolution |
 | --- | --- | --- |
-| `test_route_intent_returns_yes_on_api_exception` | Outdated or planned interface | `llm_client.route_intent` does not exist and never existed in the repo history. |
-| `test_route_intent_returns_no_for_out_of_scope` | Outdated or planned interface | Same as above. |
-| `test_rewrite_query_returns_original_on_api_failure` | Outdated or planned interface | `llm_client.rewrite_query` does not exist and never existed. |
-| `test_rewrite_query_returns_original_when_no_api_key` | Outdated or planned interface | Same as above. |
-| `test_parent_chunk_deduplication_keeps_only_first` | Test assumes an unimplemented feature | Parent/child chunking (`parent_chunk_id`) is not produced by `ingest.py` nor read by `retrieval.retrieve_with_citation`. |
-| `test_parent_text_takes_precedence_over_page_content` | Test assumes an unimplemented feature | Same: `parent_text` is not used anywhere. |
-| `test_result_count_capped_at_k` | Invalid test assumption | The mocked vector store ignores `k`; the real store honours it, so retrieval does not slice the list again. |
+| `test_route_intent_returns_yes_on_api_exception` | Outdated or planned interface: `llm_client.route_intent` has never existed in the repo history. | Replaced by `test_llm_outage_fails_closed_when_extractive_fallback_disabled` and `test_llm_outage_uses_labelled_extractive_fallback_when_enabled`, which test what `generation.answer_question` really does when the LLM is down. Note the old test expected fail-open ("yes"); the real system fails closed (abstains) unless the extractive fallback is explicitly enabled. |
+| `test_route_intent_returns_no_for_out_of_scope` | Same | Replaced by `test_out_of_scope_query_abstains_without_calling_the_llm`. |
+| `test_rewrite_query_returns_original_on_api_failure` | Outdated or planned interface: `rewrite_query` has never existed. | Covered by the outage tests above. No query-rewriting requirement exists in the project documentation. |
+| `test_rewrite_query_returns_original_when_no_api_key` | Same | Replaced by `test_missing_api_key_never_calls_the_llm`. |
+| `test_result_count_capped_at_k` | Invalid test assumption: the mocked vector store ignored `k`, and the real store honours it. | Rewritten as `test_k_is_forwarded_to_the_vector_store` (asserts `k` is passed to the store and at most `k` results come back). |
+| `test_parent_chunk_deduplication_keeps_only_first` | Pending feature: parent/child chunking (`parent_chunk_id`) is not produced by `ingest.py` nor read by `retrieve_with_citation`. | Kept unchanged as `xfail(strict=True)` with an explicit reason. |
+| `test_parent_text_takes_precedence_over_page_content` | Pending feature: same, for `parent_text`. | Kept unchanged as `xfail(strict=True)` with an explicit reason. |
 
-None of the 7 is a security defect in shipped code. No functions were added to satisfy the tests.
+None of the seven was a defect in shipped security behaviour.
 
-Open decision for the maintainers: implement the missing behaviour (then drop the xfail marks), or remove the tests that describe features the project does not have.
+## Pending-feature follow-up
 
-CI now runs `pytest tests/` and `pytest automated_security_tests/`. Local result: 132 passed, 7 xfailed.
+Implement parent/child chunking (ingest stores `parent_chunk_id` and `parent_text`; retrieval deduplicates by parent and prefers `parent_text`). Until then the two tests stay `xfail(strict=True)`: they are counted as expected failures, never as passes, and they fail the run if the feature appears without the mark being removed.
+
+## Result
+
+CI runs `pytest tests/` and `pytest automated_security_tests/`. Local run (Python 3.11, `requirements.lock`): 137 passed, 2 xfailed, 0 failed (139 tests collected across `tests/` and `automated_security_tests/`).
